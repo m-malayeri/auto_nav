@@ -40,13 +40,12 @@ def create_root() -> pt.behaviour.Behaviour:
     battery2bb = battery_status2bb(name="Battery2BB",topic_name="/battery_voltage"  )
     laserScan2BB = laser_scan_2bb(name="LaserScan2BB",topic_name="/scan",safe_range=0.2 )
     odom2BB = position_wrt_odom(name = "Position2BB")
-    walldata = wall_get_data(name = "WallData"# topic_name="/scan")
+    walldata = wall_get_data(name = "WallData")
     
     """
     Using the rotate class, create a node called "rotate_platform", and using the stop_motion class, create a node called "stop_platform"
     """
-
-    rotate_platform = rotate(name="RotatePlatform", topic_name="/cmd_vel")
+    rotate_platform = rotate(name="RotatePlatform",topic_name="/cmd_vel")
     stop_platform = stop_motion(name="StopPlatform",topic_name1="/cmd_vel")
     align = rotate_wrt_angle(name="Aligning",topic_name="/cmd_vel")
     move = move_wrt_distance(name="MoveSafe",topic_name="/cmd_vel")
