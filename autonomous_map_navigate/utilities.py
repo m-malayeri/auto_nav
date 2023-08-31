@@ -15,13 +15,8 @@ class Line:
     :type end: numpy.ndarray
     """
     def __init__(self, start: np.ndarray, end: np.ndarray):
-        if np.shape(start)!= (2,):
-            raise ValueError("Start point must have the shape (2,)")
-        if np.shape(end) != (2,):
-            raise ValueError("End point must have the shape (2,)")
-        # if (start==end).all():
-        #     raise ValueError("Start and end points must be different")
-        
+        if np.shape(start)!= (2,): raise ValueError("Start point must have the shape (2,)")
+        if np.shape(end) != (2,): raise ValueError("End point must have the shape (2,)")
         # Calculate useful properties of the line
         self.start = start
         self.line = end - start
@@ -41,8 +36,7 @@ class Line:
         :return: The minimum distance to a point.
         :rtype: float
         """
-        if np.shape(point)!= (2,):
-            raise ValueError("Start point must have the shape (2,)")
+        if np.shape(point)!= (2,): raise ValueError("Start point must have the shape (2,)")
         # compute the perpendicular distance to the theoretical infinite line
         return np.linalg.norm(np.cross(self.line, self.start - point)) /self.length
     
@@ -55,7 +49,6 @@ class Line:
         """
         # adding 1e-5 to handle cases where self.line[0] is zero
         m = self.line[1]/(self.line[0]+1e-5)
-        # m = self.line[1]/self.line[0]
         c = self.start[1] - m*self.start[0]
         return (m, c)
 
@@ -88,28 +81,21 @@ def process_data(range_data: np.ndarray, max_angle: float, min_angle: float, max
 	"""
 	Filter data by removing all perceived points outside defined boundary
 	"""
-	
 	angles = np.linspace(min_angle,max_angle,range_data.shape[0])
 	processed_data = np_polar2cart(np.array([range_data,angles]).T)
 	out_of_min_range = np.where(range_data<min_range)[0]
 	out_of_max_range = np.where(range_data>max_range)[0]
 	processed_data = np.delete(processed_data, np.concatenate([out_of_max_range,out_of_min_range]), axis=0)
-	if reduce_bool:
-		processed_data = reduction_filter(data_points=processed_data, sigma=sigma, k=rf_max_pts)    
+	if reduce_bool: processed_data = reduction_filter(data_points=processed_data, sigma=sigma, k=rf_max_pts)    
 	return processed_data
 
 def RANSAC(points: list, dist_thresh: float, iterations: int, thresh_count: int):
 
-	if len(points) == 0:
-		return False 
+	if len(points) == 0: return False 
         
-	  
 	indexes = list(range(0, len(points)))
 	# random.seed(111)
 	inliers = dict()
-    
-        
-    
     
 	for _ in range(0,iterations):
 		sample_points = indexes.copy()
@@ -124,7 +110,6 @@ def RANSAC(points: list, dist_thresh: float, iterations: int, thresh_count: int)
 				if line.point_dist(points[point_idx]) < dist_thresh:
 					inliers[(start,end)].append(points[point_idx])
         
-
 	best_pair = None
 
 	for cur_pair in inliers:
@@ -159,7 +144,6 @@ def RANSAC_get_line_params(points: list, dist_thresh: float, iterations: int, th
         best_line = Line(p1, p2)
         m, c = best_line.equation()
         end_points = None
-
         # getting starting and end points of individual lines
         best_inliers_arr = np.array(best_inliers)
         min_x, max_x = min(best_inliers_arr[:, 0]), max(best_inliers_arr[:, 0])
@@ -267,21 +251,13 @@ def reduction_filter(data_points, sigma, k):
 
 def polardatadf(data):
  
-    #min_angle_rad = -2.356194496154785
-#     max_angle_rad = 2.0923497676849365
-    
     min_angle_rad = -1.5700000524520874
     max_angle_rad = 1.5700000524520874
-
     data[data=='.inf'] = 0
     data = np.array(data, dtype=float)
-
     angles = np.linspace(min_angle_rad, max_angle_rad, data.shape[0])*180/np.pi
     polar_data = np.hstack([data.reshape(-1,1), angles.reshape(-1,1)])
-
     # filter data with zero distance
     polar_data = np.delete(polar_data, np.where(polar_data[:, 0] == 0), axis=0)
-
     df = pd.DataFrame(polar_data, columns = ['distance','angles'])
-    
     return df
