@@ -45,9 +45,9 @@ def create_root() -> pt.behaviour.Behaviour:
 
     topics2bb = pt.composites.Sequence(name="Topics2BB",memory=True)
     priorities = pt.composites.Selector(name="Priorities",memory=False)
-    wall = pt.composites.Selector(name="Wall",memory=False)
-    action = pt.composites.Selector(name="Action",memory=False)
-    cond = pt.composites.Sequence(name="Condition",memory=False)
+    # wall = pt.composites.Selector(name="Wall",memory=False)
+    # action = pt.composites.Sequence(name="Action",memory=False)
+    # cond = pt.composites.Sequence(name="Condition",memory=False)
     
 
     """
@@ -63,13 +63,21 @@ def create_root() -> pt.behaviour.Behaviour:
     
     laserScan2BB = laser_scan_2bb(
     	name="LaserScan2BB",
-    	topic_name="/scan",
-        safe_range=0.5
+    	topic_name="/sick_lms_1xx/scan",   #/sick_lms_1xx/scan for robille3
+        safe_range=0.2
     )
 
-   
-    
-       
+    # odom2BB = position_wrt_odom(
+    #     name = "Position2BB"
+        
+    # )
+
+    # walldata = wall_get_data(
+    #     name = "WallData",
+    #     topic_name="/sick_lms_1xx/scan"
+        
+    # )
+      
 
       
   	
@@ -82,6 +90,13 @@ def create_root() -> pt.behaviour.Behaviour:
     rotate_platform = rotate(name="RotatePlatform", topic_name="/cmd_vel")
     
     stop_platform = stop_motion(name="StopPlatform",topic_name1="/cmd_vel")
+
+    move_align_platform = move_allign(name="Aligning",topic_name="/cmd_vel")
+
+    following_platform = wall_following(name="Following",topic_name="/cmd_vel")
+
+
+    # find = find_wall(name="Find&Move",topic_name="/cmd_vel")
 	
 
     """
@@ -97,16 +112,49 @@ def create_root() -> pt.behaviour.Behaviour:
     def check_collison_warn_on_blackboard(blackboard):
         return blackboard.collison_warning
     
+    # def get_ransac(blackboard):
+    #     return blackboard.ransac_warn 
+
+    # def check_detect_on_blackboard(blackboard):
+    #     return blackboard.detect_warning
+    
+    def check_wallwarn_on_blackboard(blackboard):
+        return blackboard.wall_warn
+        # if blackboard.wall_warn:
+        #     return True
+        # else:
+        #     return False
+    
+    def check_aligned_on_blackboard(blackboard):
+        return blackboard.aligned
+        # if not blackboard.wall_warn:
+        #     return True
+        # else:
+        #     return False
+    
+    # def check_wallwarn_on_blackboard(blackboard):
+    #     if blackboard.wall_warn and blackboard.fix_wall_warn and not blackboard.aligned:
+    #         return True
+    #     else:
+    #         return False
+    
+    # def check_nowallwarn_on_blackboard(blackboard):
+    
+    #     if not blackboard.wall_warn and not blackboard.fix_wall_warn: 
+    #         return True
+    #     else:
+    #         return False
+        
     
     
-
-
-       
 
     
     blackboard = pt.blackboard.Blackboard()
     blackboard.battery_low_warning = False
-     
+    blackboard.collison_warning = False
+    blackboard.wall_warn = False
+    # blackboard.aligned = False
+    
     battery_emergency = pt.decorators.EternalGuard(
         name="Battery Low?",
         condition=check_battery_low_on_blackboard,
@@ -118,13 +166,38 @@ def create_root() -> pt.behaviour.Behaviour:
         name="Colliding?",
         condition=check_collison_warn_on_blackboard,
         blackboard_keys={"collison_warning"},
+
         child = stop_platform
 
     )
     
 
-    idle = pt.behaviours.Running(name="Idle")
+    check_true = pt.decorators.EternalGuard(
+        name="Move&Allign",
+        condition=check_wallwarn_on_blackboard,
+        blackboard_keys={"wall_warn"},
+        child = move_align_platform
+    ) 
 
+    check_false = pt.decorators.EternalGuard(
+        name="Aligned?",
+        condition=check_aligned_on_blackboard,
+        blackboard_keys={"aligned"},
+        child = following_platform
+    ) 
+    
+    # check_wall_fixed = pt.decorators.EternalGuard(
+    #     name="WallFixed?",
+    #     condition=check_fixwallwarn_on_blackboard,
+    #     blackboard_keys={"wall_warn"},
+    #     child = rot_align
+    # ) 
+
+
+
+
+    idle = pt.behaviours.Running(name="Idle")
+   
 
     """
     construct the behvior tree structure using the nodes and behaviors defined above
@@ -133,18 +206,22 @@ def create_root() -> pt.behaviour.Behaviour:
     ### YOUR CODE HERE ###
     
     root.add_child(topics2bb)
-    topics2bb.add_child(battery2bb)
+    # topics2bb.add_child(battery2bb)
     topics2bb.add_child(laserScan2BB)
-    
+    # topics2bb.add_child(walldata)
 
      
     root.add_child(priorities)
     priorities.add_child(collide_emergency)
     priorities.add_child(battery_emergency)
+    
+    
+    priorities.add_child(check_true)
+    # priorities.add_child(check_false)
+    
     priorities.add_child(idle)
 
 
-    
     
 
     return root
@@ -177,7 +254,7 @@ def main():
         sys.exit(1)
     
     # frequency of ticks
-    tree.tick_tock(period_ms=10)    
+    tree.tick_tock(period_ms=10) #chamge the value to 100 if required for communication   
     
     try:
         rclpy.spin(tree.node)

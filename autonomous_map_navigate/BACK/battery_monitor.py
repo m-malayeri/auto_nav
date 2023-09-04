@@ -19,50 +19,12 @@ def create_root():
     ## define nodes and behaviors
 
     # defining root node
-    root = pt.composites.Parallel(
-        name="root",
-        policy=pt.common.ParallelPolicy.SuccessOnAll(
-            synchronise=False
-        )
-    )    
-
-    """
-    Create a sequence node called "Topics2BB" and a selector node called "Priorities"    
-    """
-    ### YOUR CODE HERE ###
-    
+    root = pt.composites.Parallel(name="root",policy=pt.common.ParallelPolicy.SuccessOnAll(synchronise=False))    
     topics2bb = pt.composites.Sequence(name="Topics2BB",memory=True)
     priorities = pt.composites.Selector(name="Priorities",memory=False)
-
-
-    """
-    Using the battery_status2bb class, create a node called "Battery2BB" which subscribes to the topic "/battery_voltage"
-    """
-    ### YOUR CODE HERE ###
-
-    battery2bb = battery_status2bb(
-        name="Battery2BB",
-        topic_name="/battery_voltage",
-      
-    )
-  
-  
-    """
-    Using the rotate class, create a node called "rotate_platform"
-    """
-    ### YOUR CODE HERE ###
-    #rotate_platform = ptr.rotate.behaviour(name="rotate_platform", topic_name="/cmd_vel", direction=1, max_ang_vel=1.0)
+    battery2bb = battery_status2bb(name="Battery2BB",topic_name="/battery_voltage")
     rotate_platform = rotate(name="rotate_platform", topic_name="/cmd_vel")
-
-    """
-    Read the 'battery_low_warning' from the blackboard and set a decorator node called "Battery Low?" to check if the battery is low.
-    Please refer to the py_trees documentation for more information on decorators.
-    """
-    ### YOUR CODE HERE ###
-    
-
-    def check_battery_low_on_blackboard(blackboard):
-        return blackboard.battery_low_warning 
+    def check_battery_low_on_blackboard(blackboard): return blackboard.battery_low_warning 
     
     blackboard = pt.blackboard.Blackboard()
     blackboard.battery_low_warning = False
@@ -72,24 +34,16 @@ def create_root():
         condition=check_battery_low_on_blackboard,
         blackboard_keys={"battery_low_warning"},
         child = rotate_platform
-     
     )
-
 
     idle = pt.behaviours.Running(name="Idle")
     
 
-    """
-    construct the behavior tree structure using the nodes and behaviors defined above
-    """
-
-    ### YOUR CODE HERE ###
     root.add_child(topics2bb)
-    topics2bb.add_child(battery2bb)
     root.add_child(priorities)
+    topics2bb.add_child(battery2bb)
     priorities.add_child(battery_emergency)
     priorities.add_child(idle)
-    
     
     return root
 
@@ -100,10 +54,7 @@ def main():
     rclpy.init(args=None)
 
     root = create_root()
-    tree = ptr.trees.BehaviourTree(
-        root=root,
-        unicode_tree_debug=True
-        )
+    tree = ptr.trees.BehaviourTree(root=root,unicode_tree_debug=True)
 
     # setup the tree
     try:

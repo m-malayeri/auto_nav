@@ -9,8 +9,6 @@ import rclpy
 import sys
 from autonomous_map_navigate.behaviors import *
 
-
-
 def create_root() -> pt.behaviour.Behaviour:
     """
     Method to structure the behavior tree to monitor battery status and start rotation if battery is low.
@@ -28,85 +26,45 @@ def create_root() -> pt.behaviour.Behaviour:
     ## define nodes and behaviors
 
     # define root node
-    root = pt.composites.Parallel(
-        name="root",
-        policy=pt.common.ParallelPolicy.SuccessOnAll(
-            synchronise=False
-        )
-    )    
+    root = pt.composites.Parallel(name="root",policy=pt.common.ParallelPolicy.SuccessOnAll(synchronise=False))    
 
     """
     Create a sequence node called "Topics2BB" and a selector node called "Priorities"    
     """
     ### YOUR CODE HERE ###
     
-    # topics2bb = pt.composites.Parallel(name="Topics2BB")
-    # priorities = pt.composites.Selector(name="Priorities")
-
     topics2bb = pt.composites.Sequence(name="Topics2BB",memory=True)
     priorities = pt.composites.Selector(name="Priorities",memory=False)
-    wall = pt.composites.Selector(name="Wall",memory=False)
-    action = pt.composites.Selector(name="Action",memory=False)
-    cond = pt.composites.Sequence(name="Condition",memory=False)
-    
+    action = pt.composites.Sequence(name="Action",memory=False)
 
-    """
-    Using the battery_status2bb class, create a node called "Battery2BB" which subscribes to the topic "/battery_voltage"
-    and the laser_scan_2bb class, create a node called "LaserScan2BB" which subscribes to the topic "/scan"
-    """    
-    ### YOUR CODE HERE ###
+    battery2bb = battery_status2bb(name="Battery2BB",topic_name="/battery_voltage"  )
+    laserScan2BB = laser_scan_2bb(name="LaserScan2BB",topic_name="/scan",safe_range=0.2 )
+    odom2BB = position_wrt_odom(name = "Position2BB")
+    walldata = wall_get_data(name = "WallData")
     
-    battery2bb = battery_status2bb(
-        name="Battery2BB",
-        topic_name="/battery_voltage"  
-    )
-    
-    laserScan2BB = laser_scan_2bb(
-    	name="LaserScan2BB",
-    	topic_name="/scan",
-        safe_range=0.5
-    )
-
-   
-    
-       
-
-      
-  	
-
     """
     Using the rotate class, create a node called "rotate_platform", and using the stop_motion class, create a node called "stop_platform"
     """
-    ### YOUR CODE HERE ###
-    
-    rotate_platform = rotate(name="RotatePlatform", topic_name="/cmd_vel")
-    
+    rotate_platform = rotate(name="RotatePlatform",topic_name="/cmd_vel")
     stop_platform = stop_motion(name="StopPlatform",topic_name1="/cmd_vel")
+    align = rotate_wrt_angle(name="Aligning",topic_name="/cmd_vel")
+    move = move_wrt_distance(name="MoveSafe",topic_name="/cmd_vel")
 	
-
     """
     Read the 'battery_low_warning' and 'collison_warning' from the blackboard and set a decorator node called "Battery Low?" to check if the battery is low 
     and "Colliding?" to check if any obstacle is within minimum distance.
     Please refer to the py_trees documentation for more information on decorators.
     """
-    ### YOUR CODE HERE ###
     
-    def check_battery_low_on_blackboard(blackboard):
-        return blackboard.battery_low_warning 
-     
-    def check_collison_warn_on_blackboard(blackboard):
-        return blackboard.collison_warning
-    
-    
-    
-
-
-       
-
+    def check_battery_low_on_blackboard(blackboard): return blackboard.battery_low_warning 
+    def check_collison_warn_on_blackboard(blackboard): return blackboard.collison_warning
+    def get_ransac(blackboard): return blackboard.ransac_warn 
+    def check_detect_on_blackboard(blackboard): return blackboard.detect_warning
+    def check_wallwarn_on_blackboard(blackboard): return blackboard.wall_warn 
     
     blackboard = pt.blackboard.Blackboard()
-    blackboard.battery_low_warning = False
-     
+    blackboard.wall_warn = False
+    
     battery_emergency = pt.decorators.EternalGuard(
         name="Battery Low?",
         condition=check_battery_low_on_blackboard,
@@ -119,33 +77,33 @@ def create_root() -> pt.behaviour.Behaviour:
         condition=check_collison_warn_on_blackboard,
         blackboard_keys={"collison_warning"},
         child = stop_platform
-
     )
-    
+
+    check = pt.decorators.EternalGuard(
+        name="CheckingWall?",
+        condition=check_wallwarn_on_blackboard,
+        blackboard_keys={"wall_warn"},
+        child = action
+    ) 
 
     idle = pt.behaviours.Running(name="Idle")
-
 
     """
     construct the behvior tree structure using the nodes and behaviors defined above
     """
-
-    ### YOUR CODE HERE ###
     
     root.add_child(topics2bb)
     topics2bb.add_child(battery2bb)
     topics2bb.add_child(laserScan2BB)
-    
+    topics2bb.add_child(walldata)
 
-     
     root.add_child(priorities)
     priorities.add_child(collide_emergency)
     priorities.add_child(battery_emergency)
+    priorities.add_child(check)
+    action.add_child(move)
+    action.add_child(align)
     priorities.add_child(idle)
-
-
-    
-    
 
     return root
 
@@ -156,10 +114,7 @@ def main():
     rclpy.init(args=None)
     # Initialising the node with name "behavior_tree"
     root = create_root()
-    tree = ptr.trees.BehaviourTree(
-        root=root,
-        unicode_tree_debug=True
-        )
+    tree = ptr.trees.BehaviourTree(root=root,unicode_tree_debug=True)
 
     # setup the tree
     try:
